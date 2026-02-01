@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIKiosQ - Workshop Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom Workshop Vibes */
+      @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+      
+      body {
+        font-family: 'Courier Prime', monospace;
+        background-color: #333;
+      }
+
+      .workshop-paper {
+        background-color: #F5F5DC;
+        background-image: 
+          linear-gradient(#E8E8CF 1px, transparent 1px),
+          linear-gradient(90deg, #E8E8CF 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      
+      .blueprint-ink {
+        color: #003366;
+        stroke: #003366;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

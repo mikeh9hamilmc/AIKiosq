@@ -1,0 +1,84 @@
+{
+  "items": [
+    {
+      "id": "valve-001",
+      "name": "Quarter Turn Water Shut-Off Valve",
+      "category": "valves",
+      "keywords": ["valve", "shut-off", "shutoff", "quarter turn", "water valve", "angle stop"],
+      "aisle": "Aisle 5 - Undersink Repair",
+      "stock": 3,
+      "price": 16.99,
+      "description": "3/8\" compression inlet x 3/8\" compression outlet, chrome finish"
+    },
+    {
+      "id": "tape-001",
+      "name": "Pipe Thread Seal Tape",
+      "category": "supplies",
+      "keywords": ["teflon", "tape", "thread tape", "pipe tape", "seal tape", "ptfe"],
+      "aisle": "Aisle 5 - Undersink Repair",
+      "stock": 24,
+      "price": 1.79,
+      "description": "White PTFE thread seal tape, 1/2\" x 520\""
+    },
+    {
+      "id": "fitting-001",
+      "name": "Brass Compression Fitting",
+      "category": "fittings",
+      "keywords": ["compression", "fitting", "brass", "ferrule", "compression fitting"],
+      "aisle": "Aisle 5 - Plumbing Fittings",
+      "stock": 12,
+      "price": 4.99,
+      "description": "3/4\" compression fitting with brass ferrule and nut"
+    },
+    {
+      "id": "fitting-002",
+      "name": "Compression Ferrule Ring",
+      "category": "fittings",
+      "keywords": ["ferrule", "ring", "compression ring", "brass ring"],
+      "aisle": "Aisle 5 - Plumbing Fittings",
+      "stock": 18,
+      "price": 0.99,
+      "description": "3/4\" brass compression ferrule replacement"
+    },
+    {
+      "id": "pipe-001",
+      "name": "Copper Supply Line",
+      "category": "pipes",
+      "keywords": ["copper", "supply line", "water line", "copper pipe"],
+      "aisle": "Aisle 5 - Pipes & Tubing",
+      "stock": 8,
+      "price": 12.99,
+      "description": "3/8\" x 12\" flexible copper supply line with compression fittings"
+    },
+    {
+      "id": "ptrap-001",
+      "name": "P-Trap Assembly",
+      "category": "drain",
+      "keywords": ["p-trap", "trap", "drain trap", "sink trap", "ptrap"],
+      "aisle": "Aisle 5 - Undersink Repair",
+      "stock": 6,
+      "price": 8.99,
+      "description": "1-1/2\" PVC P-trap with slip joint connections"
+    },
+    {
+      "id": "wrench-001",
+      "name": "Basin Wrench",
+      "category": "tools",
+      "keywords": ["wrench", "basin wrench", "plumbing wrench", "faucet wrench"],
+      "aisle": "Aisle 5 - Hand Tools",
+      "stock": 5,
+      "price": 19.99,
+      "description": "Telescoping basin wrench for hard-to-reach nuts"
+    },
+    {
+      "id": "washer-001",
+      "name": "Rubber Washers Assortment",
+      "category": "supplies",
+      "keywords": ["washer", "rubber washer", "gasket", "o-ring"],
+      "aisle": "Aisle 5 - Undersink Repair",
+      "stock": 15,
+      "price": 3.99,
+      "description": "Assorted rubber washers and o-rings for faucets and valves"
+    }
+  ]
+}

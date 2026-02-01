@@ -1,0 +1,8 @@
+{
+  "name": "AIKiosQ - Hardware Assistant",
+  "description": "Zero-touch hardware store assistant with reactive visual diagrams driven by Gemini Live API.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}
