@@ -22,8 +22,8 @@ export class GeminiLiveService {
   private videoIntervalId: number | null = null;
   private isPaused = false; // Only used during tool calls to prevent mic noise during countdown/analysis
 
-  constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY, apiVersion: 'v1beta' });
+  constructor(apiKey: string) {
+    this.ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
   }
 
   public async disconnect() {

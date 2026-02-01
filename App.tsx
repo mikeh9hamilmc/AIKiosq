@@ -43,8 +43,20 @@ const App: React.FC = () => {
     setLogs((prev: { text: string; color: string }[]) => [...prev, { text, color }]);
   }, []);
 
-  const [liveService] = useState(() => new GeminiLiveService());
-  const [analysisService] = useState(() => new Gemini3AnalysisService(process.env.API_KEY!));
+  const [liveService] = useState(() => {
+    const key = process.env.API_KEY || "dummy_key_live_service";
+    return new GeminiLiveService(key);
+  });
+  const [analysisService] = useState(() => {
+    try {
+      const key = process.env.API_KEY;
+      if (!key) console.warn("Missing API_KEY in process.env");
+      return new Gemini3AnalysisService(key || "dummy_key_to_prevent_crash");
+    } catch (e) {
+      console.error("Failed to init Analysis Service", e);
+      return new Gemini3AnalysisService("dummy_key");
+    }
+  });
   const [inventoryService] = useState(() => new InventoryService());
 
   const videoRef = useRef<HTMLVideoElement>(null);
