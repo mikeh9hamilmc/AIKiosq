@@ -35,7 +35,7 @@ The AI persona is **"Mac"** — a veteran hardware store manager with 30 years o
  │    WebSocket to gemini-2.5-flash-native-audio-preview-09-2025            │
  │    Audio: 16kHz PCM in → 24kHz PCM out (Puck voice)                      │
  │    Mac greets customer via sendClientContent nudge in onopen              │
- │    Inactivity timer (15s) starts — resets on every server message         │
+ │    Inactivity timer (60s) starts — resets on every server message         │
  └──────────────────────────┬───────────────────────────────────────────────┘
                             ↓
  ┌──────────────────────────────────────────────────────────────────────────┐
@@ -56,7 +56,7 @@ The AI persona is **"Mac"** — a veteran hardware store manager with 30 years o
  ┌──────────────────────────────────────────────────────────────────────────┐
  │ 5. SESSION END / AUTO-RESET                                             │
  │    Option A: Mac: "Need anything else?" → User: "No thanks" → onclose   │
- │    Option B: 15s inactivity (no server messages) → auto-disconnect       │
+ │    Option B: 60s inactivity (no server messages) → auto-disconnect       │
  │    Either path → onclose → scheduleReset():                              │
  │      - Disconnects Live API, clears all display state                    │
  │      - Clears previousFrameRef (prevents false motion trigger)           │
@@ -86,7 +86,7 @@ This is the target interaction for the Gemini 3 Hackathon demo:
 14. **Mac**: calls `show_aisle_sign` → Screen shows Aisle 5 Sign.jpg
 15. **Mac**: "Need anything else?"
 16. **User**: "No thanks"
-17. **15 seconds of inactivity** → auto-disconnect → kiosk resets to B&W monitoring
+17. **60 seconds of inactivity** → auto-disconnect → kiosk resets to B&W monitoring
 
 ---
 
@@ -118,8 +118,6 @@ AIKiosq_r1/
     ├── inventory.json                  Mock inventory (8 items)
     ├── compression_demo.mp4            Installation demo video
     ├── Aisle 5 Sign.jpg                Aisle location photo
-    ├── black-trap.jpg                  Sample plumbing images
-    ├── sink-drain.jpg.png
     └── stuck valve.jpg
 ```
 
@@ -160,7 +158,7 @@ Gemini → Base64 PCM (24kHz) → decodeAudioData() → AudioBufferSourceNode �
 4. Sends `sendToolResponse()` back to Live API so Mac knows the action completed
 
 **Inactivity Timer:**
-- 15-second timer resets on every `onmessage` from the server
+- 60-second timer resets on every `onmessage` from the server
 - On expiry: calls `disconnect()` → `session.close()` → triggers `onclose` → `scheduleReset`
 - `disconnect()` also resets `nextStartTime = 0` and clears `sources` Set to prevent stale audio scheduling on reconnect
 
