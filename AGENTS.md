@@ -6,11 +6,11 @@ AIKiosQ is a React + TypeScript kiosk application for hardware stores. It uses t
 
 | Model | Purpose | Speed |
 |-------|---------|-------|
-| `gemini-2.5-flash-native-audio-preview-09-2025` | Real-time voice conversation via Live API | ~200ms latency |
+| `gemini-2.5-flash-native-audio-preview-09-2025` | Real-time voice conversation via Live API (Puck voice) | ~200ms latency |
 | `gemini-3-flash-preview` | Deep part analysis with image input | 3-8 seconds |
 | Mock JSON | Inventory lookup | Instant |
 
-The AI persona is **"Mac"** — a veteran hardware store manager with 30 years of plumbing experience and a friendly, funny personality. Mac uses the native audio model's built-in voice (native audio models generate speech directly — no TTS voice config).
+The AI persona is **"Mac"** — a veteran hardware store manager with 30 years of plumbing experience and a friendly, funny personality. Mac uses the Puck voice via `speechConfig`.
 
 ---
 
@@ -33,25 +33,34 @@ The AI persona is **"Mac"** — a veteran hardware store manager with 30 years o
  ┌──────────────────────────────────────────────────────────────────────────┐
  │ 3. GEMINI LIVE SESSION                                                   │
  │    WebSocket to gemini-2.5-flash-native-audio-preview-09-2025            │
- │    Audio: 16kHz PCM in → 24kHz PCM out (native voice)                    │
- │    Mac greets customer immediately via system instruction                │
+ │    Audio: 16kHz PCM in → 24kHz PCM out (Puck voice)                      │
+ │    Mac greets customer via sendClientContent nudge in onopen              │
+ │    Inactivity timer (15s) starts — resets on every server message         │
  └──────────────────────────┬───────────────────────────────────────────────┘
                             ↓
  ┌──────────────────────────────────────────────────────────────────────────┐
  │ 4. TOOL-DRIVEN CONVERSATION                                             │
  │    Mac uses 3 tools to control the UI based on conversation:             │
  │                                                                          │
- │    analyze_part ──→ Snapshot capture → Gemini 3 analysis → instructions  │
- │    check_inventory ──→ Searches inventory.json → product cards           │
+ │    analyze_part ──→ Snapshot → Gemini 3 analysis → asks before explain   │
+ │    check_inventory ──→ Searches inventory.json → returns actual results  │
  │    show_aisle_sign ──→ Displays /Aisle N Sign.jpg                        │
+ │                                                                          │
+ │    Conversation flow after analysis:                                     │
+ │    1. Mac tells customer what part was identified                         │
+ │    2. Asks "Want replacement instructions?" → explains if yes            │
+ │    3. Asks "Want me to check inventory?" → searches if yes               │
+ │    4. Mac ONLY reports what the tool returns (never fabricates)           │
  └──────────────────────────┬───────────────────────────────────────────────┘
                             ↓
  ┌──────────────────────────────────────────────────────────────────────────┐
- │ 5. SESSION END                                                           │
- │    Mac: "Need anything else?" → User: "No thanks"                        │
- │    Live API onclose fires → scheduleReset() called                       │
- │    UI cleared → 60-second timer starts                                   │
- │    After 60s: disconnect Live API → re-enable motion detection           │
+ │ 5. SESSION END / AUTO-RESET                                             │
+ │    Option A: Mac: "Need anything else?" → User: "No thanks" → onclose   │
+ │    Option B: 15s inactivity (no server messages) → auto-disconnect       │
+ │    Either path → onclose → scheduleReset():                              │
+ │      - Disconnects Live API, clears all display state                    │
+ │      - Clears previousFrameRef (prevents false motion trigger)           │
+ │      - Re-enables B&W motion detection monitoring immediately            │
  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -61,23 +70,23 @@ The AI persona is **"Mac"** — a veteran hardware store manager with 30 years o
 
 This is the target interaction for the Gemini 3 Hackathon demo:
 
-1. **Kiosk is idle**, motion sensors active
+1. **Kiosk is idle**, B&W motion detection active, "WAITING FOR NEW CUSTOMER"
 2. **Customer approaches** → motion detected → Gemini Live connects
-3. **Mac**: "How can I help you?"
-4. **User**: "I want to replace this stuck water valve, but I've heard it requires a plumber due to leak issues. I want to do it myself."
-5. **Mac**: "Can you show me the part more closely?"
+3. **Mac** greets customer automatically (nudged via `sendClientContent` on connect)
+4. **User**: "I want to replace this stuck water valve"
+5. **Mac**: "Can you show me the part up close?"
 6. **User** holds part closer to camera
-7. **Mac**: "Let me get a closer look at that..." → calls `analyze_part` tool
-8. **Screen**: Shows captured snapshot + spinning wheel while Gemini 3 analyzes
-9. **Screen**: Displays snapshot with step-by-step replacement instructions below
-10. **Mac**: "Can I show you a video on how compression fittings work?" → if yes, calls `play_compression_demo`
-11. **Screen**: Plays video
-12. **Mac**: "Do you want to know which aisle the valve can be found?" → calls `check_inventory` with "valve"
-13. **Screen**: Shows inventory card — Aisle 5, 3 in stock, $16.99 + pipe thread tape $1.79
+7. **Mac**: "Let me get a closer look..." → calls `analyze_part` tool
+8. **Screen**: Spinning wheel while Gemini 3 analyzes → then snapshot + part name
+9. **Mac**: "That's a 1/2 inch compression valve. Want instructions on how to replace it?"
+10. **User**: "Yes" → Mac explains replacement steps verbally (no text on screen)
+11. **Mac**: "Want me to check if we have that in stock?"
+12. **User**: "Yes" → Mac calls `check_inventory` with "valve"
+13. **Screen**: Inventory cards — if found, Mac reports items + Aisle 5; if not found, Mac says "sorry, we don't carry that"
 14. **Mac**: calls `show_aisle_sign` → Screen shows Aisle 5 Sign.jpg
-15. **Mac**: "Do you need anything else?"
+15. **Mac**: "Need anything else?"
 16. **User**: "No thanks"
-17. **Kiosk resets** after 1-minute cooldown → ready for next customer
+17. **15 seconds of inactivity** → auto-disconnect → kiosk resets to B&W monitoring
 
 ---
 
@@ -125,7 +134,7 @@ The real-time conversation layer. Manages the WebSocket connection to Gemini 2.5
 **Connection:**
 - Model: `models/gemini-2.5-flash-native-audio-preview-09-2025`
 - API version: `v1beta`
-- Voice: Native (no TTS `speechConfig` — native audio models generate speech directly)
+- Voice: Puck (via `speechConfig.voiceConfig.prebuiltVoiceConfig`)
 - Response modality: Audio only
 
 **Audio Pipeline:**
@@ -141,7 +150,7 @@ Gemini → Base64 PCM (24kHz) → decodeAudioData() → AudioBufferSourceNode �
 | Tool | Parameters | Handler |
 |------|-----------|---------|
 | `analyze_part` | `userQuestion: string` | Captures snapshot → calls Gemini3AnalysisService → returns results in tool response |
-| `check_inventory` | `query: string` | Calls InventoryService.searchItems() → displays product cards |
+| `check_inventory` | `query: string` | Calls InventoryService.searchItems() → returns actual results (or "no items found") to Mac → displays product cards |
 | `show_aisle_sign` | `aisleName: string` | Extracts aisle number → displays /Aisle N Sign.jpg |
 
 **Tool Response Flow:**
@@ -150,11 +159,16 @@ Gemini → Base64 PCM (24kHz) → decodeAudioData() → AudioBufferSourceNode �
 3. Executes callback (async for analyze_part and check_inventory)
 4. Sends `sendToolResponse()` back to Live API so Mac knows the action completed
 
+**Inactivity Timer:**
+- 15-second timer resets on every `onmessage` from the server
+- On expiry: calls `disconnect()` → `session.close()` → triggers `onclose` → `scheduleReset`
+- `disconnect()` also resets `nextStartTime = 0` and clears `sources` Set to prevent stale audio scheduling on reconnect
+
 **Session Lifecycle:**
-- `onopen` → start audio/video streaming
-- `onmessage` → handle audio output + tool calls
+- `onopen` → start audio streaming, start inactivity timer, send greeting nudge via `sendClientContent`
+- `onmessage` → handle audio output + tool calls, reset inactivity timer
 - `onerror` → update status display
-- `onclose` → call `onSessionEnd` callback → triggers 1-minute reset timer
+- `onclose` → call `onSessionEnd` callback → `scheduleReset` clears all state and re-enables monitoring
 
 ---
 
@@ -181,8 +195,8 @@ const text = response.text;
 
 `analyzePartForReplacement(imageBase64, userQuestion)` → `PartAnalysisResult`
 - Sends image + structured prompt to Gemini 3
-- Prompt requests: part identification, connection types, replacement steps, seal explanations, warnings
-- Response is parsed via regex into `{ partName, instructions, warnings[] }`
+- Prompt requests: part identification, connection types, replacement steps, seal explanations
+- Response is parsed via regex into `{ partName, instructions }`
 - Temperature 0.4 for consistent technical output
 
 `identifyPart(imageBase64)` → `string`
@@ -219,7 +233,7 @@ Renders content based on `LessonStage` enum:
 | `HIGHLIGHT_FERRULE` | Same diagram with animated ferrule highlight + "SEAL POINT" label |
 | `PLAYING_VIDEO` | Video player (local MP4 or Google Drive iframe) with muted-then-unmute autoplay |
 | `ANALYZING_PART` | Spinning wheel + "Mac is examining your part..." |
-| `SHOWING_ANALYSIS` | Captured snapshot image + part name + numbered instructions + red warning box |
+| `SHOWING_ANALYSIS` | Captured snapshot image + part name (Mac explains verbally — no text instructions on screen) |
 | `SHOWING_INVENTORY` | Product cards with name, description, price, aisle, stock count |
 | `SHOWING_AISLE` | Full-screen aisle sign photo with fallback SVG if image missing |
 
@@ -244,7 +258,7 @@ All state lives in the App component via `useState`:
 - `videoRef` — camera `<video>` element
 - `streamRef` — MediaStream for camera + mic
 - `previousFrameRef` — last frame for motion diff
-- `resetTimeoutRef` — 60-second reset timer handle
+- `previousFrameRef` is set to `null` on reset to ensure the motion detection loop captures a fresh baseline before triggering
 
 ---
 
@@ -273,7 +287,7 @@ For `analyze_part` specifically:
    d. setPartAnalysis(result + snapshot) → instructions show
    e. setStage(SHOWING_ANALYSIS)
 4. geminiService.ts sends tool response back to Live API
-5. Mac verbally summarizes the findings
+5. Mac tells the customer what part it is, then asks if they want replacement instructions
 ```
 
 ---
@@ -298,7 +312,9 @@ For `analyze_part` specifically:
 | Gemini 3 analysis fails | Model not available yet | Update model name in gemini3AnalysisService.ts when released |
 | Aisle sign shows blue square | Image file missing | Add `Aisle N Sign.jpg` to public/ (fallback SVG is intentional) |
 | Video won't autoplay | Browser policy | Component uses muted-then-unmute strategy; click page first if needed |
-| Reset timer not firing | Session still open | Timer triggers on Live API `onclose` event |
+| Mac silent after reset | `nextStartTime` not reset | Fixed: `disconnect()` resets `nextStartTime = 0` and clears `sources` |
+| False motion on reset | Stale `previousFrameRef` | Fixed: cleared to `null` in `scheduleReset` before re-enabling monitoring |
+| Mac fabricates inventory | Tool response was generic | Fixed: `handleCheckInventory` returns actual results or "no items found" to Mac |
 
 ---
 
@@ -317,7 +333,6 @@ The `gemini-2.5-flash-native-audio-preview-12-2025` model has a bug where it dis
 - Removing explicit `responseModalities`
 
 ### Things to avoid with native audio models
-- **No `speechConfig`**: Native audio models generate speech directly and do not support TTS voice selection (`prebuiltVoiceConfig`). Omit `speechConfig` entirely.
 - **No `sendRealtimeInput({ text })`**: The SDK's `sendRealtimeInput` only accepts `audio`, `video`, and `media` fields. Passing `{ text }` sends an empty/malformed WebSocket message.
-- **No `sendClientContent` during audio**: Calling `sendClientContent` while the model is generating audio can cause 1008. Use `sendRealtimeInput` for continuous input and return tool results via `sendToolResponse`.
+- **No `sendClientContent` during audio**: Calling `sendClientContent` while the model is generating audio can cause 1008. The greeting nudge is safe because it fires in `onopen` before audio generation starts.
 - **No background video streaming**: Sending video frames via `sendRealtimeInput({ media })` during audio sessions causes protocol conflicts.

@@ -13,7 +13,6 @@ export enum LessonStage {
 export interface PartAnalysis {
   partName: string;
   instructions: string;
-  warnings: string[];
   snapshotBase64: string;
 }
 

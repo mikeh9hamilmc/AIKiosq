@@ -10,7 +10,7 @@ import { GoogleGenAI } from '@google/genai';
 export interface PartAnalysisResult {
   partName: string;
   instructions: string;
-  warnings: string[];
+  //warnings: string[];
 }
 
 export class Gemini3AnalysisService {
@@ -34,8 +34,7 @@ Analyze the plumbing part in this image and provide:
 1. Identify what type of part this is (valve, fitting, trap, etc.)
 2. Identify the pipe connection types visible (compression, NPT threaded, slip joint, etc.)
 3. Provide SHORT, QUICK step-by-step instructions to replace this part
-4. For EACH connection type, briefly explain how the water-tight seal is made
-5. Include any critical warnings about common mistakes
+
 
 Keep your response concise and practical. Use bullet points. Write like a friendly veteran who's done this a thousand times.
 
@@ -43,10 +42,7 @@ Format your response as:
 PART: [name of part]
 
 INSTRUCTIONS:
-[numbered steps]
-
-WARNINGS:
-[important tips to avoid leaks]`;
+[numbered steps]`;
 
     try {
       const response = await this.ai.models.generateContent({
@@ -61,8 +57,12 @@ WARNINGS:
           }
         ],
         config: {
-          temperature: 0.4,
+          temperature: 1.0,
           maxOutputTokens: 1024,
+          thinkingConfig: {
+      // @ts-expect-error — thinkingLevel supported by API but not yet in SDK types
+      thinkingLevel: 'MINIMAL',
+    },
         }
       });
 
@@ -71,12 +71,12 @@ WARNINGS:
       // Parse the response
       const partMatch = text.match(/PART:\s*(.+?)(?:\n|$)/i);
       const instructionsMatch = text.match(/INSTRUCTIONS:\s*([\s\S]+?)(?=WARNINGS:|$)/i);
-      const warningsMatch = text.match(/WARNINGS:\s*([\s\S]+?)$/i);
+      //const warningsMatch = text.match(/WARNINGS:\s*([\s\S]+?)$/i);
 
       return {
         partName: partMatch?.[1]?.trim() || 'Plumbing Component',
         instructions: instructionsMatch?.[1]?.trim() || text,
-        warnings: warningsMatch?.[1]?.trim().split('\n').filter(w => w.trim()) || []
+        //warnings: warningsMatch?.[1]?.trim().split('\n').filter(w => w.trim()) || []
       };
 
     } catch (error) {

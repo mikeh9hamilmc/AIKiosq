@@ -22,6 +22,9 @@ export default defineConfig({
             args: [
                 '--use-fake-ui-for-media-stream',
                 '--use-fake-device-for-media-stream',
+                '--disable-renderer-backgrounding',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows-for-testing',
             ],
         },
     },

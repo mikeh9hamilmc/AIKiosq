@@ -7,7 +7,7 @@ interface LiveServiceCallbacks {
   onStageChange: (stage: LessonStage) => void;
   onStatusChange: (status: string) => void;
   onAnalyzePart: (imageBase64: string, userQuestion: string) => Promise<string>;
-  onCheckInventory: (query: string) => Promise<void>;
+  onCheckInventory: (query: string) => Promise<string>;
   onShowAisleSign: (aisleName: string) => void;
   onSessionEnd: () => void;
 }
@@ -21,20 +21,50 @@ export class GeminiLiveService {
   private sessionPromise: Promise<any> | null = null;
   private videoIntervalId: number | null = null;
   private isPaused = false; // Only used during tool calls to prevent mic noise during countdown/analysis
+  private inactivityTimer: number | null = null;
+  private static INACTIVITY_TIMEOUT = 60000; // 60 seconds (allow enough time for gemini 3 to respond)
 
   constructor(apiKey: string) {
     this.ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
   }
 
+  private resetInactivityTimer() {
+    if (this.inactivityTimer) {
+      window.clearTimeout(this.inactivityTimer);
+    }
+    this.inactivityTimer = window.setTimeout(() => {
+      console.log("[GeminiService] Inactivity timeout — disconnecting session");
+      this.disconnect();
+    }, GeminiLiveService.INACTIVITY_TIMEOUT);
+  }
+
+  private clearInactivityTimer() {
+    if (this.inactivityTimer) {
+      window.clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
+  }
+
   public async disconnect() {
+    this.clearInactivityTimer();
     if (this.videoIntervalId) {
       window.clearInterval(this.videoIntervalId);
       this.videoIntervalId = null;
+    }
+    // Close the WebSocket session — triggers onclose → onSessionEnd
+    if (this.sessionPromise) {
+      try {
+        const session = await this.sessionPromise;
+        session.close();
+      } catch (_) { /* session may already be closed */ }
+      this.sessionPromise = null;
     }
     if (this.inputAudioContext) await this.inputAudioContext.close();
     if (this.outputAudioContext) await this.outputAudioContext.close();
     this.inputAudioContext = null;
     this.outputAudioContext = null;
+    this.nextStartTime = 0;
+    this.sources.clear();
   }
 
   public async sendInfoToSession(text: string) {
@@ -159,9 +189,22 @@ export class GeminiLiveService {
             source.connect(scriptProcessor);
             scriptProcessor.connect(this.inputAudioContext.destination);
             // this.startVideoStreaming(stream); // DISABLED: Background video causes protocol conflicts (1008)
-            // Greeting is handled by the system instruction ("greet immediately").
+
+            // Start inactivity timer — resets on every server message
+            this.resetInactivityTimer();
+
+            // Nudge Mac to greet the customer — the model needs a user turn to start speaking.
+            this.sessionPromise?.then((session) => {
+              session.sendClientContent({
+                turns: [{ role: 'user', parts: [{ text: 'A customer just walked up to the kiosk.' }] }],
+                turnComplete: true
+              });
+            });
           },
           onmessage: async (message: LiveServerMessage) => {
+            // Reset inactivity timer on every server message
+            this.resetInactivityTimer();
+
             const hasAudio = !!message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             const hasText = !!message.serverContent?.modelTurn?.parts?.some((p: any) => p.text);
             const keys = Object.keys(message).join(',');
@@ -229,7 +272,7 @@ export class GeminiLiveService {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } },
-          systemInstruction: `You are "Mac," a veteran hardware store manager with 30 years of plumbing experience and a friendly, funny personality. You work at a modern hardware store kiosk helping customers with plumbing problems.
+          systemInstruction: `You are "Mac," a veteran plumbing store manager with 30 years of plumbing experience and a friendly, funny personality. You work at a modern plumbing store kiosk helping customers with plumbing problems.
 
 Your Style:
 - Give helpful SHORT answers unless the customer asks for more details
@@ -241,16 +284,25 @@ Your Workflow:
 
 1. GREETING: Immediately greet the customer warmly and ask how you can help. Start speaking right away.
 
-2. PART IDENTIFICATION: When a customer wants to replace a part:
+2. PART IDENTIFICATION: When a customer wants help with a part:
    - Ask them to show you the part up close to the camera
    - CALL THE TOOL "analyze_part" with their question (e.g., userQuestion: "how to replace this valve")
 
-3. INVENTORY HELP: After explaining how to fix something:
-   - Offer to check inventory: "Do you want me to check if we have that in inventory?"
-   - If yes, CALL THE TOOL "check_inventory" with what they need (e.g., query: "valve")
+3. AFTER ANALYSIS: Once the part is identified, tell the customer what part it is, then ask:
+   "Would you like instructions on how to replace that?"
+   - If YES: Explain the replacement instructions from the analysis results simply and concisely.
+   - If NO: Skip to step 4.
+
+4. INVENTORY HELP: After giving instructions (or if the customer declined instructions), ask:
+   "Want me to check if we have that in stock?"
+   - If YES: CALL THE TOOL "check_inventory" with what they need (e.g., query: "valve")
    - After getting results, offer to show them which aisle its in by CALLING "show_aisle_sign"
 
-4. CLOSING: Always ask "Need anything else?" before ending the conversation.
+5. CLOSING: Always ask "Need anything else?" before ending the conversation.
+
+IMPORTANT RULES:
+- ALWAYS trust the tool results. If check_inventory says no items were found, tell the customer you don't carry that item. NEVER make up inventory or claim you have something the tool didn't return.
+- When items ARE found, they are all in Aisle 5. Only mention Aisle 5 when the tool actually returned results.
 
 Remember: Be brief, helpful, and friendly. You're Mac - the guy everyone goes to for plumbing advice!
           `,
@@ -400,8 +452,8 @@ Remember: Be brief, helpful, and friendly. You're Mac - the guy everyone goes to
     callbacks: LiveServiceCallbacks
   ) {
     try {
-      await callbacks.onCheckInventory(query);
-      this.sendToolResponse(callId, 'check_inventory', { result: 'Inventory checked and displayed.' });
+      const resultText = await callbacks.onCheckInventory(query);
+      this.sendToolResponse(callId, 'check_inventory', { result: resultText });
     } catch (error) {
       console.error('Check inventory error:', error);
       this.sendToolResponse(callId, 'check_inventory', { result: 'Error: Inventory check failed.' });

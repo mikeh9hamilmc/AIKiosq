@@ -8,7 +8,7 @@
       "aisle": "Aisle 5 - Undersink Repair",
       "stock": 3,
       "price": 16.99,
-      "description": "3/8\" compression inlet x 3/8\" compression outlet, chrome finish"
+      "description": "threaded inlet x compression outlet, chrome finish"
     },
     {
       "id": "tape-001",
@@ -18,7 +18,7 @@
       "aisle": "Aisle 5 - Undersink Repair",
       "stock": 24,
       "price": 1.79,
-      "description": "White PTFE thread seal tape, 1/2\" x 520\""
+      "description": "White PTFE thread seal tape for threaded pipe and valves"
     },
     {
       "id": "fitting-001",
@@ -78,7 +78,7 @@
       "aisle": "Aisle 5 - Undersink Repair",
       "stock": 15,
       "price": 3.99,
-      "description": "Assorted rubber washers and o-rings for faucets and valves"
+      "description": "Assorted rubber washers and o-rings"
     }
   ]
 }

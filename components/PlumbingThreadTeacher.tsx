@@ -178,44 +178,23 @@ const PlumbingThreadTeacher: React.FC<PlumbingThreadTeacherProps> = ({
         </div>
       )}
 
-      {/* SHOWING ANALYSIS - Snapshot + Instructions */}
+      {/* SHOWING ANALYSIS - Snapshot + Part Name (Mac explains verbally) */}
       {isShowingAnalysis && partAnalysis && (
-        <div className="w-full h-full overflow-y-auto p-6 bg-[#F5F5DC]">
-          <h2 className="text-3xl text-[#003366] font-bold mb-4 border-b-4 border-[#003366] pb-2">
-            📋 REPLACEMENT INSTRUCTIONS
+        <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-[#F5F5DC]">
+          <h2 className="text-3xl text-[#003366] font-bold mb-6 border-b-4 border-[#003366] pb-2">
+            PART IDENTIFIED
           </h2>
 
-          {/* Snapshot */}
-          <div className="mb-6 border-4 border-[#003366] rounded-lg overflow-hidden shadow-lg">
+          <div className="border-4 border-[#003366] rounded-lg overflow-hidden shadow-lg max-w-2xl">
             <img
               src={`data:image/jpeg;base64,${partAnalysis.snapshotBase64}`}
               alt="Part snapshot"
               className="w-full h-auto"
             />
-            <div className="bg-[#003366] text-white px-4 py-2 font-bold">
-              PART IDENTIFIED: {partAnalysis.partName}
+            <div className="bg-[#003366] text-white px-4 py-3 text-xl font-bold text-center">
+              {partAnalysis.partName}
             </div>
           </div>
-
-          {/* Instructions */}
-          <div className="mb-6 bg-white p-4 rounded-lg border-2 border-[#003366] shadow">
-            <h3 className="text-xl text-[#003366] font-bold mb-3">STEPS:</h3>
-            <div className="text-[#003366] whitespace-pre-wrap leading-relaxed">
-              {partAnalysis.instructions}
-            </div>
-          </div>
-
-          {/* Warnings */}
-          {partAnalysis.warnings.length > 0 && (
-            <div className="bg-red-100 border-4 border-red-600 rounded-lg p-4">
-              <h3 className="text-xl text-red-800 font-bold mb-3">⚠️ IMPORTANT TIPS:</h3>
-              <ul className="text-red-900 space-y-2">
-                {partAnalysis.warnings.map((warning, i) => (
-                  <li key={i} className="leading-relaxed">• {warning}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       )}
 

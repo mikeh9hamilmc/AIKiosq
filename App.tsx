@@ -62,7 +62,6 @@ const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const previousFrameRef = useRef<ImageData | null>(null);
-  const resetTimeoutRef = useRef<number | null>(null);
 
   // Motion Detection Configuration
   const MOTION_THRESHOLD = 50;
@@ -106,46 +105,30 @@ const App: React.FC = () => {
   };
 
   const stopSystem = useCallback(async () => {
-    addLog('SHUTDOWN initiated.', 'text-red-400');
-    if (resetTimeoutRef.current) {
-      clearTimeout(resetTimeoutRef.current);
-    }
     await liveService.disconnect();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
-    setIsConnected(false);
-    setIsMonitoring(false);
-    setCurrentStep('offline');
-    setStatus('System Offline');
-    setStage(LessonStage.IDLE);
-    setVideoUrl(undefined);
-    setPartAnalysis(undefined);
-    setInventoryItems([]);
-    setAisleSignPath(undefined);
+    window.location.reload();
   }, [liveService]);
 
-  // Schedule reset after conversation ends - waits 1 minute then
-  // re-enables motion detection for the next customer
-  const scheduleReset = useCallback(() => {
-    if (resetTimeoutRef.current) {
-      clearTimeout(resetTimeoutRef.current);
-    }
-    setCurrentStep('resetting');
-    addLog('Session ended. 60s reset timer started.', 'text-yellow-400');
-    setStatus('Session ended. Resetting in 1 minute...');
+  // Reset kiosk to monitoring state after session ends
+  const scheduleReset = useCallback(async () => {
+    addLog('Session ended. Resetting...', 'text-yellow-400');
+    await liveService.disconnect();
+    setIsConnected(false);
+    setStage(LessonStage.IDLE);
+    setCurrentStep('sensors');
+    setStatus('SENSORS ACTIVE: Monitoring for Customer...');
+    setLogs([{ text: 'Boot Sequence Complete.', color: 'text-gray-300' }]);
     setPartAnalysis(undefined);
     setInventoryItems([]);
     setAisleSignPath(undefined);
     setVideoUrl(undefined);
-    resetTimeoutRef.current = window.setTimeout(async () => {
-      await liveService.disconnect();
-      setIsConnected(false);
-      setStage(LessonStage.IDLE);
-      setCurrentStep('sensors');
-      setStatus('SENSORS ACTIVE: Monitoring for Customer...');
-      setIsMonitoring(true);
-    }, 60000); // 1 minutes
+    // Clear the previous frame so motion detection needs a fresh baseline
+    // before triggering — prevents instant false "customer detected" on reset.
+    previousFrameRef.current = null;
+    setIsMonitoring(true);
   }, [liveService]);
 
   // Handle part analysis callback — returns result text for the tool response
@@ -198,7 +181,6 @@ const App: React.FC = () => {
       const result = await analysisService.analyzePartForReplacement(snapshotBase64, userQuestion);
 
       addLog(`Part identified: ${result.partName}`, 'text-green-400');
-      addLog(`${result.warnings.length} warning(s) found.`, result.warnings.length > 0 ? 'text-red-400' : 'text-green-400');
 
       setPartAnalysis({
         ...result,
@@ -209,8 +191,8 @@ const App: React.FC = () => {
       setStatus('✅ Analysis complete!');
       addLog('Analysis displayed on screen.', 'text-green-400');
 
-      // Return results for the tool response — Mac will explain them
-      return `Analysis Complete.\nPart Identified: ${result.partName}\nInstructions: ${result.instructions}\nWarnings: ${result.warnings.join(', ')}\n\nPlease explain these results to the customer simply and concisely.`;
+      // Return results for the tool response — Mac will ask before explaining
+      return `Analysis Complete.\nPart Identified: ${result.partName}\nInstructions: ${result.instructions}\n\nTell the customer what part this is, then ask if they would like replacement instructions.`;
 
     } catch (error) {
       console.error('Part analysis failed:', error);
@@ -233,7 +215,7 @@ const App: React.FC = () => {
   }, [handleAnalyzePart, analysisService]);
 
   // Handle inventory check callback
-  const handleCheckInventory = useCallback(async (query: string) => {
+  const handleCheckInventory = useCallback(async (query: string): Promise<string> => {
     try {
       addLog(`Tool call: check_inventory("${query}")`, 'text-cyan-300');
       setCurrentStep('inventory');
@@ -249,10 +231,17 @@ const App: React.FC = () => {
       setInventoryItems(items);
       setStage(LessonStage.SHOWING_INVENTORY);
       setStatus(`Found ${items.length} item(s) in stock`);
+
+      if (items.length === 0) {
+        return `No items found matching "${query}". Tell the customer we don't carry that item right now.`;
+      }
+      const summary = items.map(item => `${item.name} - $${item.price.toFixed(2)} - ${item.aisle} (${item.stock} in stock)`).join('\n');
+      return `Found ${items.length} item(s):\n${summary}\n\nTell the customer what we have and offer to show them the aisle.`;
     } catch (error) {
       console.error('Inventory check failed:', error);
       setStatus('❌ Inventory lookup failed');
       addLog(`Inventory FAILED: ${error}`, 'text-red-400');
+      return 'Inventory lookup failed. Apologize and suggest the customer ask a store associate.';
     }
   }, [inventoryService, addLog]);
 
@@ -280,17 +269,44 @@ const App: React.FC = () => {
     setIsConnected(true);
     setIsMonitoring(false);
     setCurrentStep('connecting');
+    // Clear previous session's display data
+    setPartAnalysis(undefined);
+    setInventoryItems([]);
+    setAisleSignPath(undefined);
+    setVideoUrl(undefined);
+    setStage(LessonStage.IDLE);
     addLog('Customer Detected!', 'text-yellow-400');
     addLog('Connecting to Gemini Live...', 'text-yellow-400');
 
     await liveService.start({
       onStageChange: (newStage) => {
-        setStage(newStage);
+        setStage(prev => {
+          // Prevent overwriting active tool/analysis states with IDLE or generic states
+          const activeStates = [
+            LessonStage.COUNTDOWN_TO_SNAPSHOT,
+            LessonStage.ANALYZING_PART,
+            LessonStage.SHOWING_ANALYSIS,
+            LessonStage.SHOWING_INVENTORY,
+            LessonStage.SHOWING_AISLE
+          ];
+          if (activeStates.includes(prev) && newStage === LessonStage.IDLE) {
+            return prev;
+          }
+          return newStage;
+        });
         addLog(`Stage -> ${newStage}`, 'text-gray-400');
       },
       onStatusChange: (newStatus) => {
         setStatus(newStatus);
-        if (newStatus.includes('Connected')) setCurrentStep('greeting');
+        if (newStatus.includes('Connected')) {
+          setCurrentStep(prev => {
+            // Don't overwrite active tool states with "greeting"
+            if (['analyzing', 'inventory', 'aisle', 'video'].includes(prev)) {
+              return prev;
+            }
+            return 'greeting';
+          });
+        }
       },
       onAnalyzePart: handleAnalyzePart,
       onCheckInventory: handleCheckInventory,
